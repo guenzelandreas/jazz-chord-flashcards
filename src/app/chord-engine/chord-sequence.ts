@@ -8,6 +8,8 @@ export interface ChordSequenceOptions {
   /** The progression in Roman numerals, or several alternatives. */
   progression: string | readonly string[];
   keyOrder: KeyOrder;
+  /** Keys the sequence may use. Defaults to all twelve. */
+  keys?: readonly Key[];
   /** Defaults to rating 1 for every key. */
   keyRatings?: KeyRatings;
   /** When false, all keys come up equally often and the ratings are ignored. Defaults to true. */
@@ -43,7 +45,11 @@ export class ChordSequence {
    */
   configure(options: Partial<ChordSequenceOptions>): void {
     const next = withDefaults({ ...this.options, ...definedOnly(options) });
-    if (next.keyRatings !== this.options.keyRatings || next.weightKeys !== this.options.weightKeys) {
+    if (
+      next.keys !== this.options.keys ||
+      next.keyRatings !== this.options.keyRatings ||
+      next.weightKeys !== this.options.weightKeys
+    ) {
       this.cycleKeys = [];
     }
     this.options = next;
@@ -94,20 +100,35 @@ export class ChordSequence {
   }
 
   private nextKey(): Key {
+    if (this.currentKey !== null && this.options.keys.length === 1) {
+      throw new RangeError('At least two keys are required to avoid consecutive repeats');
+    }
     const order = this.options.keyOrder;
     if (order === 'WC') {
       return this.nextKeyInCycle();
     }
     const step = INTERVAL_STEPS[order];
     if (step !== undefined) {
-      return this.currentKey === null ? 'C' : transposeKey(this.currentKey, step);
+      return this.nextKeyInIntervalOrder(step);
     }
     return this.randomKey();
   }
 
+  /** Follows the app's circle-of-fourths order, skipping keys outside the selected set. */
+  private nextKeyInIntervalOrder(step: number): Key {
+    const start = this.currentKey === null ? 'C' : this.currentKey;
+    for (let distance = this.currentKey === null ? 0 : 1; distance < 12; distance++) {
+      const key = transposeKey(start, distance * step);
+      if (this.options.keys.includes(key) && key !== this.currentKey) {
+        return key;
+      }
+    }
+    throw new RangeError('At least two selected keys are required to avoid consecutive repeats');
+  }
+
   /** Random: a key with rating r has 6 - r tickets (1 each when unweighted); the current key is left out. */
   private randomKey(): Key {
-    const tickets = FLAT_KEYS.filter((key) => key !== this.currentKey).flatMap((key) =>
+    const tickets = this.options.keys.filter((key) => key !== this.currentKey).flatMap((key) =>
       Array<Key>(this.options.weightKeys ? 6 - ratingOf(this.options.keyRatings, key) : 1).fill(key),
     );
     return pick(tickets, this.random);
@@ -121,7 +142,7 @@ export class ChordSequence {
     for (;;) {
       while (this.cycleKeys.length === 0) {
         this.cycle++;
-        this.cycleKeys = FLAT_KEYS.filter(
+        this.cycleKeys = this.options.keys.filter(
           (key) => this.cycle % (this.options.weightKeys ? ratingOf(this.options.keyRatings, key) : 1) === 0,
         );
       }
@@ -138,12 +159,17 @@ export class ChordSequence {
 }
 
 function withDefaults(options: ChordSequenceOptions): Required<ChordSequenceOptions> {
-  return {
+  const result = {
     progression: options.progression,
     keyOrder: options.keyOrder,
+    keys: options.keys ?? FLAT_KEYS,
     keyRatings: options.keyRatings ?? defaultKeyRatings(),
     weightKeys: options.weightKeys ?? true,
   };
+  if (result.keys.length === 0 || new Set(result.keys).size !== result.keys.length) {
+    throw new RangeError('Selected keys must be a non-empty list without duplicates');
+  }
+  return result;
 }
 
 /** The options without the ones set to undefined, so these keep their current value. */

@@ -44,6 +44,39 @@ describe('ChordSequence', () => {
     });
   }
 
+  it('restricts each key order to a selected subset', () => {
+    const selectedKeys = ['C', 'D', 'G', 'A'] as const;
+    const selected = new Set<Key>(selectedKeys);
+    for (const keyOrder of ['R', 'WC', '5', '-5'] as const) {
+      const sequence = new ChordSequence(
+        { progression: 'I*maj7*', keyOrder, keys: selectedKeys, weightKeys: false },
+        seededRandom(11),
+      );
+      const keys = sequence.take(40).map((bar) => bar.key);
+      assert.ok(keys.every((key) => selected.has(key)));
+      assert.ok(keys.every((key, index) => key !== keys[index - 1]));
+    }
+  });
+
+  it('follows the app interval order while skipping unselected keys', () => {
+    for (const [keyOrder, expected] of [
+      ['5', ['C', 'A', 'D', 'G']],
+      ['-5', ['C', 'G', 'D', 'A']],
+    ] as const) {
+      const sequence = new ChordSequence({
+        progression: 'I*maj7*',
+        keyOrder,
+        keys: ['C', 'D', 'G', 'A'],
+      });
+      assert.deepEqual(sequence.take(4).map((bar) => bar.key), expected);
+    }
+  });
+
+  it('rejects repeated or empty selected-key sets', () => {
+    assert.throws(() => new ChordSequence({ progression: 'I*7*', keyOrder: 'R', keys: [] }));
+    assert.throws(() => new ChordSequence({ progression: 'I*7*', keyOrder: 'R', keys: ['C', 'C'] }));
+  });
+
   it('brings up keys with a low rating more often in random order', () => {
     const sequence = new ChordSequence(
       { progression: 'I*maj7*', keyOrder: 'R', keyRatings: ratings((key) => (key === 'Gb' ? 1 : 5)) },

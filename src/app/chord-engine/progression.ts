@@ -1,4 +1,4 @@
-import { noteInKey, type Key } from './keys.ts';
+import { FLAT_KEYS, SHARP_KEYS, keyIndex, noteInKey, transposeKey, type Key } from './keys.ts';
 import { pick, type Random } from './random.ts';
 
 /** A piece of a chord symbol: the chord type (written between asterisks) is shown in superscript. */
@@ -111,6 +111,43 @@ export function resolveNumerals(text: string, key: Key): string {
 /** The chord symbol as plain text, for example 'Dm7' or 'Bm7(b5)'. */
 export function chordToText(chord: Chord): string {
   return chord.parts.map((part) => part.text).join('');
+}
+
+/** Transpose the chord root (and an optional slash bass note) from one key's spelling to another. */
+export function transposeChord(chord: Chord, fromKey: Key, halfSteps: number): Chord {
+  if (!Number.isInteger(halfSteps)) {
+    throw new RangeError(`Not a whole number of half steps: ${halfSteps}`);
+  }
+  if (halfSteps === 0) {
+    return chord;
+  }
+
+  const toKey = transposeKey(fromKey, halfSteps);
+  const parts = chord.parts.map((part) => ({ ...part }));
+  const root = chord.root === null ? null : transposeNote(chord.root, fromKey, toKey);
+  const firstTextPart = parts.find((part) => !part.superscript);
+  if (root !== null && firstTextPart) {
+    firstTextPart.text = firstTextPart.text.replace(ROOT, root);
+  }
+  for (const part of parts) {
+    if (!part.superscript) {
+      part.text = part.text.replace(/\/([A-G][#b]?)(?=$|[^A-Za-z#b])/g, (_match, note: string) =>
+        `/${transposeNote(note, fromKey, toKey)}`,
+      );
+    }
+  }
+  return { root, parts };
+}
+
+function transposeNote(note: string, fromKey: Key, toKey: Key): string {
+  const flatIndex = FLAT_KEYS.indexOf(note as Key);
+  const sharpIndex = SHARP_KEYS.indexOf(note as (typeof SHARP_KEYS)[number]);
+  const pitchClass = flatIndex >= 0 ? flatIndex : sharpIndex;
+  if (pitchClass < 0) {
+    throw new RangeError(`Not a recognized note name: ${note}`);
+  }
+  const interval = (pitchClass - keyIndex(fromKey) + 12) % 12;
+  return noteInKey(toKey, interval);
 }
 
 /** The chord symbol as HTML with the chord type in <sup>, for example 'Dm<sup>7</sup>'. The text is escaped. */

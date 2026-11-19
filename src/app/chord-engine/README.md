@@ -23,7 +23,7 @@ for (const bar of sequence.take(4)) {
 | `exercises.ts`      | The predefined exercises and the default custom progression                                   |
 | `key-orders.ts`     | Random, Weighted Cycle and the perfect fourth orders                                          |
 | `key-ratings.ts`    | Ratings 1–5 per key, in the format the app stores                                             |
-| `progression.ts`    | Parses a progression and puts it into a key: `progressionInKey`, `chordToText`, `chordToHtml` |
+| `progression.ts`    | Parses progressions and renders/transposes chords: `progressionInKey`, `chordToText`, `chordToHtml`, `transposeChord` |
 | `chord-sequence.ts` | `ChordSequence`: the endless stream of bars, one key after the other                          |
 | `bass-line.ts`      | The bass note for each beat of a bar                                                          |
 | `random.ts`         | A seeded random number generator for repeatable results                                       |
@@ -36,6 +36,8 @@ The same syntax as on the documentation page under "Custom progressions":
 - `m` and any other text outside asterisks is shown as written; every `i` and `v` there is read as a numeral
 - `*7*`: the chord type, shown in superscript and kept exactly as written
 - `-` next chord in the same bar, `|` next bar, `||` alternatives (one is picked at random for each key)
+
+`transposeChord(chord, fromKey, halfSteps)` transposes a parsed chord root and optional slash bass note, spelling them in the destination key. `ChordSequence` accepts an optional `keys` list to restrict its key orders; interval orders follow their circle and skip keys not in the list.
 
 Chords in G, D, A, E and B are spelled with sharps, in all other keys with flats.
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { chordToHtml, chordToText, progressionInKey, resolveNumerals, type Bar } from './progression.ts';
+import { chordToHtml, chordToText, progressionInKey, resolveNumerals, transposeChord, type Bar } from './progression.ts';
 import { seededRandom } from './random.ts';
 
 /** The bars as text, chords separated by ' – ', for compact expectations. */
@@ -69,6 +69,29 @@ describe('progressionInKey', () => {
       seen.add(text(progressionInKey(['I*maj7*', 'Im*7*'], 'F', random)).join(' | '));
     }
     assert.deepEqual([...seen].sort(), ['C7', 'Cm7', 'Cmaj7', 'Fm7', 'Fmaj7']);
+  });
+});
+
+describe('transposeChord', () => {
+  it('transposes generated roots, literal roots, and slash bass notes with destination-key spelling', () => {
+    const bars = progressionInKey('iim*7* - V*7* | I*maj7*', 'C');
+    assert.deepEqual(
+      bars.map((bar) => bar.chords.map((chord) => chordToText(transposeChord(chord, 'C', 2))).join(' – ')),
+      ['Em7 – A7', 'Dmaj7'],
+    );
+
+    const [literalBar] = progressionInKey('C*maj7* - G/B*7*', 'C');
+    assert.deepEqual(
+      literalBar.chords.map((chord) => chordToText(transposeChord(chord, 'C', 2))),
+      ['Dmaj7', 'A/C#7'],
+    );
+  });
+
+  it('leaves chords unchanged at concert pitch', () => {
+    const [bar] = progressionInKey('C*maj7*', 'C');
+    const chord = bar.chords[0];
+    assert.ok(chord);
+    assert.equal(chordToText(transposeChord(chord, 'C', 0)), 'Cmaj7');
   });
 });
 
